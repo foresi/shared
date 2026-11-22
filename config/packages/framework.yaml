@@ -1,0 +1,180 @@
+# see https://symfony.com/doc/current/reference/configuration/framework.html
+framework:
+    secret: '%env(APP_SECRET)%'
+
+    # Note that the session will be started ONLY if you read or write from it.
+    session: true
+    csrf_protection: true
+
+    rate_limiter:
+        # Outgoing calls to public registers. PublicRegistryClient keys the limiter by registry
+        # name (ares, vies, adis), so each host gets its own budget of 300 calls per minute.
+        # ARES may restrict clients above 500 queries per minute; stay well under that.
+        registry_outgoing:
+            policy: sliding_window
+            limit: 300
+            interval: '1 minute'
+
+        # Registry lookups of the contact form, per signed-in user.
+        party_lookup:
+            policy: sliding_window
+            limit: 30
+            interval: '1 minute'
+
+        # Manual "refresh checks" on a contact, per signed-in user.
+        party_refresh_checks:
+            policy: sliding_window
+            limit: 10
+            interval: '1 minute'
+
+        # Test e-mails of a firm's mail server, per signed-in user.
+        mail_test:
+            policy: sliding_window
+            limit: 5
+            interval: '1 minute'
+
+        # Codes of the two-factor sign-in, per user and never reset by the password:
+        # signing in again does not buy more guesses.
+        two_factor_code:
+            policy: sliding_window
+            limit: 5
+            interval: '5 minutes'
+
+        # Documents sent by e-mail, per signed-in user and per firm.
+        invoice_send:
+            policy: sliding_window
+            limit: 30
+            interval: '1 minute'
+        invoice_send_firm:
+            policy: sliding_window
+            limit: 500
+            interval: '1 day'
+
+        # Public links to sent documents, per client address.
+        document_link:
+            policy: sliding_window
+            limit: 60
+            interval: '1 minute'
+
+        # The inbound mail webhook, per client address: requests whose secret is wrong or missing.
+        inbound_mail:
+            policy: sliding_window
+            limit: 120
+            interval: '1 minute'
+        # The inbound mail webhook, per client address: requests with the right secret, a budget
+        # of their own, so strangers sharing the relay's address cannot lock it out.
+        inbound_mail_relay:
+            policy: sliding_window
+            limit: 600
+            interval: '1 minute'
+
+        # The health endpoint, per client address: a monitor calls it every few minutes.
+        health:
+            policy: sliding_window
+            limit: 60
+            interval: '1 minute'
+
+        # Invitation links, per client address: guessing a token stays hopeless.
+        invitation_link:
+            policy: sliding_window
+            limit: 30
+            interval: '1 minute'
+
+    #esi: true
+    #fragments: true
+
+services:
+    # Declared here (private) so PHPStan, which reads the dev container, knows the
+    # ids used by the tests; they are made public in the test env below.
+    test.invoice_send_firm_limiter:
+        alias: limiter.invoice_send_firm
+    test.document_link_limiter:
+        alias: limiter.document_link
+    test.inbound_mail_limiter:
+        alias: limiter.inbound_mail
+    test.inbound_mail_relay_limiter:
+        alias: limiter.inbound_mail_relay
+    test.invitation_link_limiter:
+        alias: limiter.invitation_link
+
+when@test:
+    framework:
+        rate_limiter:
+            party_lookup:
+                storage_service: test.party_lookup_storage
+            party_refresh_checks:
+                storage_service: test.party_refresh_checks_storage
+            registry_outgoing:
+                storage_service: test.registry_outgoing_storage
+            mail_test:
+                storage_service: test.mail_test_storage
+            two_factor_code:
+                storage_service: test.two_factor_code_storage
+            invoice_send:
+                storage_service: test.invoice_send_storage
+            invoice_send_firm:
+                storage_service: test.invoice_send_firm_storage
+            document_link:
+                storage_service: test.document_link_storage
+            inbound_mail:
+                storage_service: test.inbound_mail_storage
+            inbound_mail_relay:
+                storage_service: test.inbound_mail_relay_storage
+            health:
+                storage_service: test.health_storage
+            invitation_link:
+                storage_service: test.invitation_link_storage
+        test: true
+        session:
+            storage_factory_id: session.storage.factory.mock_file
+
+    services:
+        # In memory, so the budgets never leak between test runs; login_throttling is the
+        # storage of the sign-in throttle in config/packages/security.yaml.
+        test.party_lookup_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.party_refresh_checks_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.registry_outgoing_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.login_throttling_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.mail_test_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.two_factor_code_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.invoice_send_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.invoice_send_firm_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.document_link_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.inbound_mail_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.inbound_mail_relay_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.health_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        test.invitation_link_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        # Lets a test spend the budget of a firm, an address or a link.
+        test.invoice_send_firm_limiter:
+            alias: limiter.invoice_send_firm
+            public: true
+        test.document_link_limiter:
+            alias: limiter.document_link
+            public: true
+        test.inbound_mail_limiter:
+            alias: limiter.inbound_mail
+            public: true
+        test.inbound_mail_relay_limiter:
+            alias: limiter.inbound_mail_relay
+            public: true
+        test.invitation_link_limiter:
+            alias: limiter.invitation_link
+            public: true
+
+when@e2e:
+    framework:
+        # Fixed here so the browser tests need no local .env file; never used outside tests/e2e.
+        secret: 'e2e-only-secret-not-for-real-use'

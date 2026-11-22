@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+framework:
+    rate_limiter:
+        # Requests of the REST API and of MCP over HTTP, per personal API token (ADR 0027); see Foresi\Shared\Infrastructure\Api\ApiRateLimit.
+        api_token:
+            policy: sliding_window
+            limit: 600
+            interval: '10 minutes'
+        # Writes over REST and MCP, per token, on top of the requests above (ADR 0032); see Foresi\Shared\Infrastructure\Api\WriteBudget.
+        api_token_write:
+            policy: sliding_window
+            limit: 120
+            interval: '10 minutes'
+        # Dynamic client registrations of OAuth clients, per address (ADR 0036); see Foresi\Identity\Infrastructure\OAuth\OAuthRegisterController.
+        oauth_register:
+            policy: sliding_window
+            limit: 20
+            interval: '1 hour'
+
+services:
+    # Declared here (private) so PHPStan, which reads the dev container, knows the
+    # ids used by the tests; they are made public in the test env below.
+    test.api_token_limiter:
+        alias: limiter.api_token
+    test.api_token_write_limiter:
+        alias: limiter.api_token_write
+
+when@test:
+    framework:
+        rate_limiter:
+            api_token:
+                storage_service: test.api_token_storage
+            api_token_write:
+                storage_service: test.api_token_storage
+            oauth_register:
+                storage_service: test.api_token_storage
+
+    services:
+        # In memory, so the budget of a token never leaks between test runs.
+        test.api_token_storage:
+            class: Symfony\Component\RateLimiter\Storage\InMemoryStorage
+        # Lets a test spend the budget of a token.
+        test.api_token_limiter:
+            alias: limiter.api_token
+            public: true
+        test.api_token_write_limiter:
+            alias: limiter.api_token_write
+            public: true

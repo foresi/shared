@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+framework:
+    messenger:
+        failure_transport: failed
+
+        # A message that cannot be read goes to the failed transport instead of being lost.
+        serializer:
+            default_serializer: Foresi\Shared\Infrastructure\Messenger\KeepUndecodableMessages
+
+        transports:
+            # Default queue. redeliver_timeout must exceed the longest handler, or a slow
+            # message is delivered to a second worker while the first is still on it.
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: async
+                    redeliver_timeout: 7200
+                retry_strategy:
+                    max_retries: 3
+                    delay: 2000
+                    multiplier: 4
+            # Low priority: public register re-checks. Consume it after async.
+            registry:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: registry
+                    redeliver_timeout: 7200
+                retry_strategy:
+                    max_retries: 3
+                    delay: 2000
+                    multiplier: 4
+            # Outgoing mail, apart so a slow mail server never holds up other work. The
+            # retries wait 1, 4, 16, 64 and 256 minutes, about 5.7 hours in all, which
+            # outlasts greylisting. A permanent refusal skips them.
+            mail:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: mail
+                    redeliver_timeout: 600
+                retry_strategy:
+                    max_retries: 5
+                    delay: 60000
+                    multiplier: 4
+            # The relay of domain events and their delivery to async listeners. On the
+            # database connection, so the relay stores its deliveries in its own
+            # transaction. A listener that fails is retried after 5 s, 30 s, 3 min,
+            # 18 min and 1.8 h, about 2.1 hours in all.
+            events:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: events
+                    redeliver_timeout: 600
+                retry_strategy:
+                    max_retries: 5
+                    delay: 5000
+                    multiplier: 6
+            # Outbound webhooks, one message per attempt, apart so a slow receiver holds
+            # up only this worker. The delivery row keeps the schedule and the next
+            # attempt is dispatched with a delay, so Messenger never retries. An attempt
+            # ends within 15 s, well inside the redeliver timeout.
+            webhooks:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: webhooks
+                    redeliver_timeout: 600
+                retry_strategy:
+                    max_retries: 0
+            failed:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: failed
+
+        # Each module's bundle routes its own messages to these transports and adds its
+        # middleware (Foresi\Shared\Infrastructure\Module\ModuleBundle).
+
+# The end-to-end environment has no worker: messages are handled inline.
+when@e2e:
+    framework:
+        messenger:
+            transports:
+                async: 'sync://'
+                registry: 'sync://'
+                mail: 'sync://'
+                events: 'sync://'
+                webhooks: 'sync://'
+                failed: 'in-memory://'

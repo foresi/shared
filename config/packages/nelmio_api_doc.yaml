@@ -1,0 +1,1177 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# The OpenAPI document of the REST API, served at /api/v1/openapi.json (ADR 0027).
+# The controllers describe their answers; the shapes of the presenters
+# (Foresi\*\Infrastructure\Api\*Json) are written by hand here.
+nelmio_api_doc:
+    documentation:
+        info:
+            title: Foresi API
+            description: The REST API of Foresi. Every request signs in with a personal API token.
+            version: '1'
+        security:
+            - bearer: []
+        components:
+            securitySchemes:
+                bearer:
+                    type: http
+                    scheme: bearer
+                    description: A personal API token, issued in Settings, API.
+            schemas:
+                Money:
+                    type: object
+                    required: [amount_minor, currency]
+                    properties:
+                        amount_minor: { type: integer, description: The amount in minor units of the currency. }
+                        currency: { type: string, example: CZK }
+                Address:
+                    type: object
+                    required: [street, city, postal_code, country_code]
+                    properties:
+                        street: { type: string }
+                        city: { type: string }
+                        postal_code: { type: string }
+                        country_code: { type: string, description: ISO 3166-1 alpha-2. }
+                Reference:
+                    type: object
+                    required: [id, name]
+                    properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                Problem:
+                    type: object
+                    description: An RFC 9457 problem document.
+                    required: [type, title, status, detail, code]
+                    properties:
+                        type: { type: string, example: about:blank }
+                        title: { type: string }
+                        status: { type: integer }
+                        detail: { type: string }
+                        code: { type: string, description: 'A stable code, such as not_found, forbidden, invalid_parameter or rate_limited.' }
+                        parameter: { type: string, description: 'The parameter that cannot be used, with invalid_parameter.' }
+                Me:
+                    type: object
+                    required: [user, token]
+                    properties:
+                        user:
+                            type: object
+                            properties:
+                                id: { type: string, format: uuid }
+                                email: { type: string }
+                        token:
+                            type: object
+                            properties:
+                                id: { type: string, format: uuid }
+                                name: { type: string }
+                                scopes: { type: array, items: { type: string, enum: [read, write] } }
+                                expires_at: { type: string, format: date-time }
+                InvoiceListItem:
+                    type: object
+                    required: [id, number, kind, firm, customer, issue_date, due_date, tax_point_date, total, paid, remaining, payment_state, overdue, sent, sent_at, delivered, trashed, created_at]
+                    properties:
+                        id: { type: string, format: uuid }
+                        number: { type: string }
+                        kind: { type: string, enum: [invoice, advance, payment_tax_document, correction_document] }
+                        firm: { $ref: '#/components/schemas/Reference' }
+                        customer: { $ref: '#/components/schemas/Reference' }
+                        issue_date: { type: string, format: date }
+                        due_date: { type: string, format: date }
+                        tax_point_date: { type: string, format: date, nullable: true }
+                        total: { $ref: '#/components/schemas/Money' }
+                        paid: { $ref: '#/components/schemas/Money' }
+                        remaining: { $ref: '#/components/schemas/Money' }
+                        payment_state: { type: string, enum: [unpaid, partly_paid, paid, overpaid, to_refund] }
+                        overdue: { type: boolean }
+                        sent: { type: boolean, description: 'Whether it was sent to the customer: by e-mail, or marked sent by hand.' }
+                        sent_at: { type: string, format: date-time, nullable: true, description: 'When it was first sent; null while it was not.' }
+                        delivered: { type: boolean, deprecated: true, description: 'Deprecated: the older name of sent, with the same value.' }
+                        trashed: { type: boolean }
+                        created_at: { type: string, format: date-time }
+                InvoiceLine:
+                    type: object
+                    properties:
+                        description: { type: string }
+                        quantity: { type: string, example: '1.0000' }
+                        unit: { type: string }
+                        unit_price: { $ref: '#/components/schemas/Money' }
+                        price_type: { type: string, enum: [with_vat, without_vat, base_only] }
+                        discount_percent: { type: string, example: '0.00' }
+                        vat_treatment: { type: string, enum: [standard, reverse_charge, exempt, not_applicable] }
+                        vat_rate_kind: { type: string, nullable: true, enum: [base, reduced, second_reduced] }
+                        vat_rate_percent: { type: string, nullable: true, example: '21.00' }
+                        net: { $ref: '#/components/schemas/Money' }
+                        vat: { $ref: '#/components/schemas/Money' }
+                        gross: { $ref: '#/components/schemas/Money' }
+                InvoiceDetail:
+                    type: object
+                    properties:
+                        id: { type: string, format: uuid }
+                        number: { type: string }
+                        kind: { type: string, enum: [invoice, advance, payment_tax_document, correction_document] }
+                        firm: { $ref: '#/components/schemas/Reference' }
+                        customer:
+                            type: object
+                            properties:
+                                id: { type: string, format: uuid }
+                                name: { type: string }
+                                registration_number: { type: string, nullable: true }
+                                vat_id: { type: string, nullable: true }
+                                address: { $ref: '#/components/schemas/Address' }
+                        issue_date: { type: string, format: date }
+                        due_date: { type: string, format: date }
+                        tax_point_date: { type: string, format: date, nullable: true }
+                        currency: { type: string }
+                        variable_symbol: { type: string }
+                        order_number: { type: string }
+                        description: { type: string }
+                        payment_method: { type: string, enum: [bank_transfer, cash, card] }
+                        net: { $ref: '#/components/schemas/Money' }
+                        vat: { $ref: '#/components/schemas/Money' }
+                        total: { $ref: '#/components/schemas/Money' }
+                        payment_state: { type: string, enum: [unpaid, partly_paid, paid, overpaid, to_refund] }
+                        sent: { type: boolean, description: 'Whether it was sent to the customer: by e-mail, or marked sent by hand.' }
+                        sent_at: { type: string, format: date-time, nullable: true, description: 'When it was first sent; null while it was not.' }
+                        delivered: { type: boolean, deprecated: true, description: 'Deprecated: the older name of sent, with the same value.' }
+                        trashed: { type: boolean }
+                        created_at: { type: string, format: date-time }
+                        corrected_invoice_id: { type: string, format: uuid, nullable: true }
+                        lines: { type: array, items: { $ref: '#/components/schemas/InvoiceLine' } }
+                        payments:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    payment_id: { type: string, format: uuid }
+                                    received_on: { type: string, format: date }
+                                    allocated: { $ref: '#/components/schemas/Money' }
+                                    settlement: { $ref: '#/components/schemas/Money' }
+                                    method: { type: string, enum: [bank_transfer, cash, card] }
+                                    source: { type: string, enum: [manual, bank_movement] }
+                        corrections:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    id: { type: string, format: uuid }
+                                    number: { type: string }
+                                    issue_date: { type: string, format: date }
+                                    total: { $ref: '#/components/schemas/Money' }
+                        balances:
+                            type: object
+                            properties:
+                                paid: { $ref: '#/components/schemas/Money' }
+                                corrections: { $ref: '#/components/schemas/Money' }
+                                remaining: { $ref: '#/components/schemas/Money' }
+                                to_refund: { $ref: '#/components/schemas/Money' }
+                InvoicePage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/InvoiceListItem' } }
+                        next_cursor: { type: string, nullable: true }
+                        applied_view: { allOf: [{ $ref: '#/components/schemas/SavedView' }], nullable: true, description: 'The saved view the view parameter named; null without one.' }
+                Contact:
+                    type: object
+                    required: [id, kind, name, roles, registration_country, registration_number, vat_id, email, billing_address, archived]
+                    properties:
+                        id: { type: string, format: uuid }
+                        kind: { type: string, enum: [person, sole_trader, company] }
+                        name: { type: string }
+                        roles: { type: array, items: { type: string, enum: [customer, supplier, partner, authority] } }
+                        registration_country: { type: string, nullable: true }
+                        registration_number: { type: string, nullable: true }
+                        vat_id: { type: string, nullable: true }
+                        email: { type: string, nullable: true }
+                        billing_address: { allOf: [{ $ref: '#/components/schemas/Address' }], nullable: true }
+                        archived: { type: boolean }
+                Firm:
+                    type: object
+                    description: The one firm of the instance, the company that issues its documents and receives its payments.
+                    properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        registration_country: { type: string, example: CZ }
+                        registration_number: { type: string }
+                        vat_id: { type: string, nullable: true }
+                        vat_status: { type: string, enum: [registered, not_registered, identified_person] }
+                        register_entry: { type: string }
+                        address:
+                            type: object
+                            properties:
+                                street: { type: string }
+                                city: { type: string }
+                                postal_code: { type: string }
+                                country_code: { type: string }
+                ContactDetail:
+                    allOf:
+                        - $ref: '#/components/schemas/Contact'
+                        - type: object
+                          properties:
+                              phone: { type: string }
+                              mobile: { type: string }
+                              website: { type: string }
+                              unreliable_payer: { type: boolean }
+                              addresses:
+                                  type: array
+                                  items:
+                                      allOf:
+                                          - $ref: '#/components/schemas/Address'
+                                          - type: object
+                                            properties:
+                                                id: { type: string, format: uuid }
+                                                type: { type: string, enum: [billing, delivery, postal, other] }
+                                                label: { type: string }
+                              emails:
+                                  type: array
+                                  items:
+                                      type: object
+                                      properties:
+                                          id: { type: string, format: uuid }
+                                          address: { type: string }
+                                          purpose: { type: string, enum: [general, invoices, copy] }
+                              bank_accounts:
+                                  type: array
+                                  items:
+                                      type: object
+                                      properties:
+                                          id: { type: string, format: uuid }
+                                          iban: { type: string }
+                                          bic: { type: string, nullable: true }
+                                          label: { type: string }
+                                          primary: { type: boolean }
+                              contact_persons:
+                                  type: array
+                                  items:
+                                      type: object
+                                      properties:
+                                          id: { type: string, format: uuid }
+                                          company: { $ref: '#/components/schemas/Reference' }
+                                          person: { $ref: '#/components/schemas/Reference' }
+                                          position: { type: string }
+                                          primary: { type: boolean }
+                ContactPage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/Contact' } }
+                        next_cursor: { type: string, nullable: true }
+                        applied_view: { allOf: [{ $ref: '#/components/schemas/SavedView' }], nullable: true, description: 'The saved view the view parameter named; null without one.' }
+                Project:
+                    type: object
+                    required: [id, name, client, visibility, workflow, open_tasks, nearest_due_on, archived]
+                    properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        client: { allOf: [{ $ref: '#/components/schemas/Reference' }], nullable: true }
+                        visibility: { type: string, enum: [organisation, chosen], description: 'Open to the whole organisation, or to the people it is shared with.' }
+                        workflow: { type: string, enum: [simple, development] }
+                        open_tasks: { type: integer, description: 'Tasks and subtasks the person sees that are not finished.' }
+                        nearest_due_on: { type: string, format: date, nullable: true }
+                        archived: { type: boolean }
+                ProjectDetail:
+                    allOf:
+                        - $ref: '#/components/schemas/Project'
+                        - type: object
+                          required: [description, billable_by_default, statuses, sections]
+                          properties:
+                              description: { type: string, description: Markdown. }
+                              billable_by_default: { type: boolean, nullable: true, description: Null for a guest. }
+                              statuses:
+                                  type: array
+                                  items:
+                                      type: object
+                                      properties:
+                                          id: { type: string, format: uuid }
+                                          name: { type: string }
+                                          type: { type: string, enum: [open, active, done, closed], description: 'done and closed finish a task.' }
+                                          position: { type: integer }
+                              sections:
+                                  type: array
+                                  description: The sections the person sees.
+                                  items:
+                                      type: object
+                                      properties:
+                                          id: { type: string, format: uuid }
+                                          name: { type: string }
+                                          position: { type: integer }
+                ProjectPage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/Project' } }
+                        next_cursor: { type: string, nullable: true }
+                        applied_view: { allOf: [{ $ref: '#/components/schemas/SavedView' }], nullable: true, description: 'The saved view the view parameter named; null without one.' }
+                Label:
+                    type: object
+                    required: [id, name, colour]
+                    properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        colour: { type: string, enum: [gray, green, amber, red] }
+                Task:
+                    type: object
+                    required: [id, title, project, section_id, parent_id, status, responsible, due_on, priority, labels, subtask_count, done, private, url]
+                    properties:
+                        id: { type: string, format: uuid }
+                        title: { type: string }
+                        project: { $ref: '#/components/schemas/Reference' }
+                        section_id: { type: string, format: uuid, nullable: true }
+                        parent_id: { type: string, format: uuid, nullable: true, description: 'The task this is a subtask of.' }
+                        status:
+                            type: object
+                            properties:
+                                id: { type: string, format: uuid }
+                                name: { type: string }
+                                type: { type: string, enum: [open, active, done, closed] }
+                        responsible: { allOf: [{ $ref: '#/components/schemas/Reference' }], nullable: true, description: 'The id is a membership, as responsible_id takes it.' }
+                        due_on: { type: string, format: date, nullable: true }
+                        priority: { type: string, enum: [none, low, medium, high, urgent] }
+                        labels: { type: array, items: { $ref: '#/components/schemas/Label' } }
+                        subtask_count: { type: integer }
+                        done: { type: boolean, description: 'Its status is of type done or closed.' }
+                        private: { type: boolean, description: 'Only the people it is shared with see it.' }
+                        url: { type: string, format: uri, description: 'The page of the task, for a person to open.' }
+                TaskDetail:
+                    allOf:
+                        - $ref: '#/components/schemas/Task'
+                        - type: object
+                          required: [description, section, parent, watchers, subtasks, estimate_minutes, project_archived, created_at, completed_at]
+                          properties:
+                              description: { type: string, description: Markdown. }
+                              section: { allOf: [{ $ref: '#/components/schemas/Reference' }], nullable: true }
+                              parent:
+                                  type: object
+                                  nullable: true
+                                  properties:
+                                      id: { type: string, format: uuid }
+                                      title: { type: string }
+                              watchers: { type: array, items: { $ref: '#/components/schemas/Reference' } }
+                              subtasks: { type: array, items: { $ref: '#/components/schemas/Task' } }
+                              estimate_minutes: { type: integer, nullable: true, description: Null for a guest. }
+                              project_archived: { type: boolean }
+                              created_at: { type: string, format: date-time }
+                              completed_at: { type: string, format: date-time, nullable: true }
+                TaskPage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/Task' } }
+                        next_cursor: { type: string, nullable: true }
+                        applied_view: { allOf: [{ $ref: '#/components/schemas/SavedView' }], nullable: true, description: 'The saved view of the list work.my_tasks the view parameter named; null without one.' }
+                TaskComment:
+                    type: object
+                    required: [id, author, text, internal, created_at, edited_at]
+                    properties:
+                        id: { type: string, format: uuid }
+                        author: { $ref: '#/components/schemas/Reference' }
+                        text: { type: string, description: 'Markdown, written by a person.' }
+                        internal: { type: boolean, description: 'Read by the people of the organisation only.' }
+                        created_at: { type: string, format: date-time }
+                        edited_at: { type: string, format: date-time, nullable: true }
+                TimeEntry:
+                    type: object
+                    required: [id, project, task, person, worked_on, minutes, started_at, ended_at, note, billable, running, invoiced]
+                    properties:
+                        id: { type: string, format: uuid }
+                        project: { $ref: '#/components/schemas/Reference' }
+                        task:
+                            type: object
+                            nullable: true
+                            properties:
+                                id: { type: string, format: uuid }
+                                title: { type: string }
+                        person: { $ref: '#/components/schemas/Reference' }
+                        worked_on: { type: string, format: date }
+                        minutes: { type: integer, nullable: true, description: 'Null while the timer runs.' }
+                        started_at: { type: string, format: date-time, nullable: true }
+                        ended_at: { type: string, format: date-time, nullable: true }
+                        note: { type: string }
+                        billable: { type: boolean }
+                        running: { type: boolean }
+                        invoiced: { type: boolean }
+                TimeEntryPage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/TimeEntry' } }
+                        next_cursor: { type: string, nullable: true }
+                Payment:
+                    type: object
+                    properties:
+                        id: { type: string, format: uuid }
+                        firm: { $ref: '#/components/schemas/Reference' }
+                        received_on: { type: string, format: date }
+                        amount: { $ref: '#/components/schemas/Money' }
+                        direction: { type: string, enum: [incoming, refund] }
+                        method: { type: string, enum: [bank_transfer, cash, card] }
+                        source: { type: string, enum: [manual, bank_movement] }
+                        note: { type: string }
+                        bank_movement_id: { type: string, format: uuid, nullable: true }
+                        cancelled_at: { type: string, format: date-time, nullable: true }
+                        created_at: { type: string, format: date-time }
+                        allocations:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    invoice:
+                                        type: object
+                                        properties:
+                                            id: { type: string, format: uuid }
+                                            number: { type: string }
+                                    amount: { $ref: '#/components/schemas/Money' }
+                                    settlement: { $ref: '#/components/schemas/Money' }
+                Event:
+                    type: object
+                    description: A domain event. Its facts are ids, codes and amounts as text, never personal data.
+                    required: [id, type, version, position, occurred_at, subject, data, correlation_id, actor]
+                    properties:
+                        id: { type: string, format: uuid }
+                        type: { type: string, example: invoicing.invoice.paid }
+                        version: { type: integer, description: 'The version of the type; a type only gains facts within a version.' }
+                        position: { type: integer, description: 'The place in the feed. Read on after the highest position you have seen.' }
+                        occurred_at: { type: string, format: date-time }
+                        subject:
+                            type: object
+                            required: [type, id, url]
+                            properties:
+                                type: { type: string, example: invoice }
+                                id: { type: string }
+                                url: { type: string, nullable: true, description: 'The API path of the subject.' }
+                        data: { type: object, additionalProperties: true }
+                        correlation_id: { type: string, nullable: true, description: 'Ties the events of one piece of work together.' }
+                        actor:
+                            type: object
+                            required: [kind]
+                            properties:
+                                kind: { type: string }
+                EventPage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/Event' } }
+                        next_cursor: { type: string, nullable: true }
+                PaymentPage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/Payment' } }
+                        next_cursor: { type: string, nullable: true }
+                SavedView:
+                    type: object
+                    description: A saved view of a list (spec D2), private to its owner or shared with the staff; a view a module ships has a system key and no owner.
+                    properties:
+                        id: { type: string, format: uuid }
+                        list: { type: string, description: 'The list, such as invoicing.invoices.' }
+                        name: { type: string }
+                        system_key: { type: string, nullable: true }
+                        visibility: { type: string, enum: [private, shared] }
+                        owner_id: { type: string, format: uuid, nullable: true }
+                        filters:
+                            type: object
+                            properties:
+                                match: { type: string, enum: [all] }
+                                conditions:
+                                    type: array
+                                    items:
+                                        type: object
+                                        properties:
+                                            field: { type: string }
+                                            op: { type: string }
+                                            value: { description: 'A value of the field''s type; see GET /api/v1/lists.' }
+                        sort: { type: array, items: { type: object, properties: { field: { type: string }, dir: { type: string, enum: [asc, desc] } } } }
+                        display: { type: object, nullable: true }
+                        show_count: { type: boolean }
+                        placement: { type: string, enum: [primary, overflow] }
+                        position: { type: integer }
+                        hidden: { type: boolean }
+                        may_edit: { type: boolean, description: 'Whether the token''s person may change or delete it.' }
+                        created_at: { type: string, format: date-time }
+                        updated_at: { type: string, format: date-time }
+                ViewList:
+                    type: object
+                    description: A list saved views filter, with what a filter on it may use.
+                    properties:
+                        key: { type: string }
+                        fields:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    key: { type: string }
+                                    type: { type: string, enum: [enum, reference, text, number, date, boolean] }
+                                    label: { type: string }
+                                    operators: { type: array, items: { type: string } }
+                                    options: { type: array, items: { type: string } }
+                        columns:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    key: { type: string }
+                                    label: { type: string }
+                                    sortable: { type: boolean }
+                                    default: { type: boolean }
+                                    locked: { type: boolean }
+                        default_views: { type: array, items: { type: string } }
+                CashFlowPlannedItem:
+                    type: object
+                    description: Money a firm expects to receive or pay that no document carries yet, one-off or recurring.
+                    properties:
+                        id: { type: string, format: uuid }
+                        firm: { $ref: '#/components/schemas/Reference' }
+                        direction: { type: string, enum: [in, out] }
+                        name: { type: string }
+                        category: { type: string, enum: [revenue, purchases, rent, software, payroll, taxes, insurance, vat, loans, owner_draws, other] }
+                        amount: { $ref: '#/components/schemas/Money' }
+                        counterparty: { allOf: [{ $ref: '#/components/schemas/Reference' }], nullable: true }
+                        'on': { type: string, format: date, description: 'The day of a one-off item, the first day of a recurring one.' }
+                        repeat: { type: string, enum: [day, week, month, year], nullable: true }
+                        every: { type: integer, nullable: true }
+                        last_day_of_month: { type: boolean }
+                        ends_on: { type: string, format: date, nullable: true }
+                        ends_after: { type: integer, nullable: true }
+                        included: { type: boolean }
+                        skipped_on: { type: array, items: { type: string, format: date } }
+                        match:
+                            type: object
+                            properties:
+                                account: { type: string, nullable: true }
+                                variable_symbol: { type: string, nullable: true }
+                                tolerance: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                        created_at: { type: string, format: date-time }
+                CashFlowCheckpoint:
+                    type: object
+                    description: The balance of a firm bank account at the end of a day.
+                    properties:
+                        id: { type: string, format: uuid }
+                        bank_account:
+                            type: object
+                            properties:
+                                id: { type: string, format: uuid }
+                                iban: { type: string }
+                                label: { type: string }
+                        firm_id: { type: string, format: uuid }
+                        'on': { type: string, format: date }
+                        amount: { $ref: '#/components/schemas/Money' }
+                        recorded_at: { type: string, format: date-time }
+                CashFlowExpectedDate:
+                    type: object
+                    properties:
+                        subject_type: { type: string }
+                        subject_id: { type: string }
+                        expected_on: { type: string, format: date, nullable: true, description: Null once cleared. }
+                CashFlowMinimumBalance:
+                    type: object
+                    properties:
+                        firm_id: { type: string, format: uuid }
+                        amount: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                CashFlowTotals:
+                    type: object
+                    properties:
+                        total: { $ref: '#/components/schemas/Money' }
+                        by_category: { type: object, additionalProperties: { $ref: '#/components/schemas/Money' } }
+                        by_certainty: { type: object, description: 'The same money by how sure it is (document, schedule, plan, estimate).', additionalProperties: { $ref: '#/components/schemas/Money' } }
+                CashFlowItem:
+                    type: object
+                    description: One expected flow, counted in the period that holds counted_on.
+                    properties:
+                        source: { type: string, example: cash-flow.planned_items }
+                        subject:
+                            type: object
+                            properties:
+                                type: { type: string, example: planned_item }
+                                id: { type: string }
+                                url: { type: string, nullable: true }
+                        direction: { type: string, enum: [in, out] }
+                        label: { type: string }
+                        category: { type: string, enum: [revenue, purchases, rent, software, payroll, taxes, insurance, vat, loans, owner_draws, other] }
+                        certainty: { type: string, enum: [document, schedule, plan, estimate] }
+                        flags: { type: array, items: { type: string, enum: [overdue, estimated, no_due_date, expected_date] } }
+                        expected_on: { type: string, format: date }
+                        counted_on: { type: string, format: date }
+                        amount: { $ref: '#/components/schemas/Money' }
+                        amount_czk: { $ref: '#/components/schemas/Money' }
+                        counterparty_id: { type: string, format: uuid, nullable: true }
+                CashFlowForecast:
+                    type: object
+                    description: The forecast of a firm in CZK at today's ČNB rate, by ISO weeks until the end of next month, then by calendar months.
+                    properties:
+                        firm: { $ref: '#/components/schemas/Reference' }
+                        currency: { type: string, example: CZK }
+                        today: { type: string, format: date }
+                        from: { type: string, format: date }
+                        to: { type: string, format: date }
+                        certainty: { type: array, description: 'The certainties counted; all four unless the certainty parameter chose some.', items: { type: string, enum: [document, schedule, plan, estimate] } }
+                        balance:
+                            type: object
+                            properties:
+                                amount: { $ref: '#/components/schemas/Money' }
+                                as_of: { type: string, format: date, nullable: true }
+                                stale: { type: boolean, description: 'The oldest balance is older than 7 days, or there is none.' }
+                                accounts:
+                                    type: array
+                                    items:
+                                        type: object
+                                        properties:
+                                            id: { type: string, format: uuid }
+                                            iban: { type: string }
+                                            label: { type: string }
+                                            balance: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                                            amount: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                                            as_of: { type: string, format: date, nullable: true }
+                                            source: { type: string, nullable: true }
+                        periods:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    key: { type: string, example: 2026-W47 }
+                                    kind: { type: string, enum: [week, month] }
+                                    start: { type: string, format: date }
+                                    end: { type: string, format: date }
+                                    opening: { $ref: '#/components/schemas/Money' }
+                                    inflows: { $ref: '#/components/schemas/CashFlowTotals' }
+                                    outflows: { $ref: '#/components/schemas/CashFlowTotals' }
+                                    closing: { $ref: '#/components/schemas/Money' }
+                                    items: { type: array, items: { $ref: '#/components/schemas/CashFlowItem' } }
+                        lowest:
+                            type: object
+                            properties:
+                                amount: { $ref: '#/components/schemas/Money' }
+                                'on': { type: string, format: date }
+                        minimum_balance: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                        shortfall_on: { type: string, format: date, nullable: true }
+                        incomplete: { type: boolean }
+                        unavailable_sources: { type: array, items: { type: string } }
+                        unavailable_rates: { type: array, items: { type: string } }
+                TaxStatus:
+                    type: object
+                    description: A status of the owner from valid_from until the next status of its kind.
+                    properties:
+                        id: { type: string, format: uuid }
+                        kind: { type: string, enum: [legal_form, activity, vat_payer, flat_rate_band, sickness_insurance, health_minimum_exempt] }
+                        value: { type: string, example: 'yes' }
+                        valid_from: { type: string, format: date }
+                        base: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                TaxStatusRemoved:
+                    type: object
+                    properties:
+                        id: { type: string, format: uuid }
+                        removed: { type: boolean }
+                TaxYear:
+                    type: object
+                    description: The inputs of one year of the owner profile; all amounts in CZK.
+                    properties:
+                        year: { type: integer, example: 2026 }
+                        expense_methods: { type: array, items: { type: string, enum: [actual, lump_80, lump_60, lump_40, lump_30] } }
+                        chosen_method: { type: string, nullable: true }
+                        children:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    label: { type: string }
+                                    birth_date: { type: string, format: date }
+                                    order: { type: integer, enum: [1, 2, 3] }
+                                    ztp_p: { type: boolean }
+                                    months: { type: integer, minimum: 0, maximum: 12 }
+                        spouse:
+                            type: object
+                            nullable: true
+                            properties:
+                                months: { type: integer, minimum: 0, maximum: 12 }
+                                ztp_p: { type: boolean }
+                                low_income: { type: boolean }
+                        deductions:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    type: { type: string }
+                                    amount: { $ref: '#/components/schemas/Money' }
+                        other_bases:
+                            type: object
+                            properties:
+                                employment: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                                employment_tax_withheld: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                                rental: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                                other: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                        last_known_tax: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                        previous_year:
+                            type: object
+                            properties:
+                                social_base: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                                health_base: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                                overview_filed_on: { type: string, format: date, nullable: true }
+                                activity_months: { type: integer, minimum: 1, maximum: 12, nullable: true }
+                        return_route: { type: string, enum: [paper, electronic, advisor] }
+                        activity_start: { type: string, format: date, nullable: true }
+                        average_wage_override: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                TaxAuthorityAccount:
+                    type: object
+                    properties:
+                        authority: { type: string, enum: [social, health, sickness, income_tax, flat_rate] }
+                        account: { type: string }
+                        variable_symbol: { type: string }
+                TaxProfile:
+                    type: object
+                    description: The owner profile; only the owner reads it.
+                    properties:
+                        statuses: { type: array, items: { $ref: '#/components/schemas/TaxStatus' } }
+                        years: { type: array, items: { $ref: '#/components/schemas/TaxYear' } }
+                        authorities: { type: array, items: { $ref: '#/components/schemas/TaxAuthorityAccount' } }
+                TaxAmountFigures:
+                    type: object
+                    description: 'Amounts in CZK. counted is what the records count: the gross before the day the owner became a VAT payer, the net from it.'
+                    properties:
+                        gross: { $ref: '#/components/schemas/Money' }
+                        net: { $ref: '#/components/schemas/Money' }
+                        vat: { $ref: '#/components/schemas/Money' }
+                        counted: { $ref: '#/components/schemas/Money' }
+                TaxEstimateResult:
+                    type: object
+                    description: 'A year computed by a regime, such as the Czech sole trader: one result per expense method, each with its steps.'
+                    properties:
+                        regime: { type: string, example: cz.sole_trader }
+                        rules:
+                            type: object
+                            properties:
+                                year: { type: integer, example: 2026 }
+                                status: { type: string, enum: [published, derived, latest_used] }
+                                values:
+                                    type: array
+                                    items:
+                                        type: object
+                                        properties:
+                                            key: { type: string, example: social.minimum_share.main }
+                                            value: { type: string, example: '35' }
+                                            valid_from: { type: string, format: date }
+                                            source_url: { type: string, format: uri }
+                                            unverified: { type: boolean }
+                        methods:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    method: { type: string, enum: [actual, lump_80, lump_60, lump_40, lump_30] }
+                                    totals:
+                                        type: object
+                                        properties:
+                                            income: { $ref: '#/components/schemas/Money' }
+                                            costs: { $ref: '#/components/schemas/Money' }
+                                            expenses: { $ref: '#/components/schemas/Money' }
+                                            profit: { $ref: '#/components/schemas/Money' }
+                                            social: { $ref: '#/components/schemas/Money' }
+                                            health: { $ref: '#/components/schemas/Money' }
+                                            sickness: { $ref: '#/components/schemas/Money' }
+                                            income_tax: { $ref: '#/components/schemas/Money' }
+                                            child_bonus: { $ref: '#/components/schemas/Money' }
+                                            levies: { $ref: '#/components/schemas/Money' }
+                                            take_home: { $ref: '#/components/schemas/Money' }
+                                            social_base: { $ref: '#/components/schemas/Money' }
+                                            flat_rate: { $ref: '#/components/schemas/Money', description: 'The flat-rate tax of the months in it; the levies add it. Social, health and income tax are those of the other months.' }
+                                    steps:
+                                        type: array
+                                        items:
+                                            type: object
+                                            properties:
+                                                key: { type: string, enum: [profit, social, health, sickness, tax_base, income_tax, credits, child_benefit, flat_rate], description: 'flat_rate only in a year with flat-rate months.' }
+                                                input: { type: object, additionalProperties: { type: string } }
+                                                rule: { type: string }
+                                                source_url: { type: string, format: uri }
+                                                result: { type: string, example: '60056.00' }
+                        cheaper_method: { type: string, nullable: true, enum: [actual, lump_80, lump_60, lump_40, lump_30] }
+                        break_even: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true, description: How much more real cost would make the actual costs cost as much as the cheapest lump sum. }
+                        credits:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    key: { type: string, example: taxpayer }
+                                    claimed: { type: boolean }
+                                    amount: { $ref: '#/components/schemas/Money' }
+                                    explanation: { type: string }
+                        months:
+                            type: array
+                            items:
+                                type: object
+                                properties:
+                                    month: { type: string, example: '2026-07' }
+                                    activity: { type: string, enum: [none, secondary, main] }
+                                    health_minimum_exempt: { type: boolean }
+                                    sickness_insurance: { type: boolean }
+                                    minimum_social_advance: { $ref: '#/components/schemas/Money' }
+                                    minimum_health_advance: { $ref: '#/components/schemas/Money' }
+                                    flat_rate_band: { type: string, nullable: true, enum: ['1', '2', '3'], description: 'The band when the month is in the flat-rate tax; its smallest advances are then the social and health parts of the band.' }
+                        flat_rate:
+                            type: object
+                            nullable: true
+                            description: 'The flat-rate regime of the year, the same for every expense method; null without a flat-rate month. A month whose flat_rate_band is 1, 2 or 3 on its first day pays the band amount, which replaces social, health and income tax; no credit, deduction or child benefit applies. Becoming a VAT payer ends it at the end of that year.'
+                            properties:
+                                months:
+                                    type: array
+                                    items:
+                                        type: object
+                                        properties:
+                                            month: { type: string, example: '2026-07' }
+                                            band: { type: string, enum: ['1', '2', '3'] }
+                                            income_tax: { $ref: '#/components/schemas/Money' }
+                                            social: { $ref: '#/components/schemas/Money' }
+                                            health: { $ref: '#/components/schemas/Money' }
+                                            total: { $ref: '#/components/schemas/Money' }
+                                income_tax: { $ref: '#/components/schemas/Money' }
+                                social: { $ref: '#/components/schemas/Money' }
+                                health: { $ref: '#/components/schemas/Money' }
+                                total: { $ref: '#/components/schemas/Money' }
+                        switch_adjustment:
+                            type: object
+                            nullable: true
+                            description: 'The adjustment of the year before when the expense method changes (ZDP § 23 (8)): from actual costs to a lump sum, or into a whole year of the flat-rate tax. The receivables open at the end of the year before raise its tax base and, with actual costs before, the open payables lower it; advances stay out. The tax on the change, at the marginal rate of the year before, is due with an additional return by the return deadline of this year, as the payment of kind switch_adjustment. It is never inside the totals, and the warning switch_adjustment names it; unverified, and its effect on the insurance (switch_adjustment_insurance) too.'
+                            properties:
+                                adjusted_year: { type: integer, example: 2026 }
+                                from_method: { type: string, enum: [actual, lump_80, lump_60, lump_40, lump_30] }
+                                into: { type: string, enum: [lump_80, lump_60, lump_40, lump_30, flat_rate] }
+                                open_on: { type: string, format: date, description: 'The last day of the year before, when the documents were open.' }
+                                receivables: { $ref: '#/components/schemas/Money', description: 'Open issued invoices, without VAT when the owner was a VAT payer on that day.' }
+                                payables: { $ref: '#/components/schemas/Money', description: 'Open received documents; zero when the year before had a lump sum.' }
+                                base_change: { $ref: '#/components/schemas/Money', description: 'The receivables less the payables; below zero it lowers the base.' }
+                                previous_tax_base: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true, description: 'Null when the year before has no rules; the tax then takes the basic rate of this year.' }
+                                rate: { type: string, example: '15', description: 'The marginal rate in per cent.' }
+                                tax: { $ref: '#/components/schemas/Money', description: 'The change of the tax of the year before; below zero no payment comes of it.' }
+                                due_on: { type: string, format: date }
+                                source_url: { type: string, format: uri }
+                TaxEstimate:
+                    type: object
+                    description: 'The estimate of the taxes and contributions of a year, never a basis for the tax return. "To date" and "year end" are never mixed; a part that cannot be computed is null with its reason. Only the owner reads it.'
+                    properties:
+                        estimate: { type: boolean, enum: [true] }
+                        year: { type: integer, example: 2026 }
+                        today: { type: string, format: date }
+                        to_date: { allOf: [{ $ref: '#/components/schemas/TaxEstimateResult' }], nullable: true }
+                        to_date_reason: { type: string, nullable: true, enum: [year_not_started, rules_not_available] }
+                        year_end: { allOf: [{ $ref: '#/components/schemas/TaxEstimateResult' }], nullable: true }
+                        year_end_reason: { type: string, nullable: true, enum: [year_not_started, rules_not_available, cash_flow_not_installed, forecast_unavailable] }
+                        forecast:
+                            type: object
+                            nullable: true
+                            description: 'The forecast part of the year end, from today to 31 December: open documents split into net and VAT in their own ratio, recurring invoices and planned items as stated. It leaves out the estimate itself and the categories taxes, insurance, vat, loans and owner_draws. Null for a past year and without Cash flow.'
+                            properties:
+                                from: { type: string, format: date }
+                                to: { type: string, format: date }
+                                totals:
+                                    type: object
+                                    properties:
+                                        income: { $ref: '#/components/schemas/TaxAmountFigures' }
+                                        cost: { $ref: '#/components/schemas/TaxAmountFigures' }
+                                flags: { type: array, items: { type: string, enum: [forecast.plan_no_vat_split, forecast.no_vat_split_restricted, forecast.no_vat_split_unknown] }, description: Where the forecast could not split the VAT. }
+                                incomplete: { type: boolean, description: A source failed or an amount had no rate; what failed is left out. }
+                                unavailable_sources: { type: array, items: { type: string } }
+                                restricted_sources: { type: array, items: { type: string } }
+                        forecast_by_certainty:
+                            type: object
+                            nullable: true
+                            description: The forecast part split by how sure it is.
+                            properties:
+                                document: { $ref: '#/components/schemas/TaxForecastPart' }
+                                schedule: { $ref: '#/components/schemas/TaxForecastPart' }
+                                plan: { $ref: '#/components/schemas/TaxForecastPart' }
+                        accruals:
+                            type: array
+                            description: "The levies of the year end spread over its months by each month's share of the profit, with the smallest advances in a month of low profit; the months add up to the levies of the year."
+                            items:
+                                type: object
+                                properties:
+                                    method: { type: string, enum: [actual, lump_80, lump_60, lump_40, lump_30] }
+                                    months:
+                                        type: array
+                                        items:
+                                            type: object
+                                            properties:
+                                                month: { type: string, example: '2026-11' }
+                                                profit: { $ref: '#/components/schemas/Money' }
+                                                minimum: { $ref: '#/components/schemas/Money' }
+                                                levies: { $ref: '#/components/schemas/Money' }
+                        amounts:
+                            type: object
+                            nullable: true
+                            properties:
+                                from: { type: string, format: date }
+                                to: { type: string, format: date }
+                                totals:
+                                    type: object
+                                    properties:
+                                        income: { $ref: '#/components/schemas/TaxAmountFigures' }
+                                        cost: { $ref: '#/components/schemas/TaxAmountFigures' }
+                                unavailable_sources: { type: array, items: { type: string } }
+                                restricted_sources: { type: array, items: { type: string } }
+                                missing_rates: { type: array, items: { type: string } }
+                        payments:
+                            type: array
+                            description: 'The payments of the year by due day: every advance, and the settlement in the next year once the year end is known; an overpayment comes back. A bank movement that meets the match rule of its authority (the account and variable symbol in the profile) pays it; one unpaid after its due day is overdue. The payments not yet paid are the estimate flows of the cash flow.'
+                            items:
+                                type: object
+                                properties:
+                                    key: { type: string, example: social.advance.2026-12 }
+                                    authority: { type: string, enum: [social, health, sickness, income_tax, flat_rate] }
+                                    kind: { type: string, enum: [advance, settlement, overpayment, switch_adjustment], description: 'switch_adjustment is the tax of a change of the expense method, of the year of the change.' }
+                                    period: { type: string, example: '2026-12', description: 'The month ("2026-12") or the year ("2026") it covers.' }
+                                    direction: { type: string, enum: [in, out] }
+                                    payable_from: { type: string, format: date }
+                                    due_on: { type: string, format: date }
+                                    amount: { $ref: '#/components/schemas/Money' }
+                                    state: { type: string, enum: [expected, paid, overdue] }
+                                    match_rule:
+                                        type: object
+                                        nullable: true
+                                        description: Null until the authority's account is in the profile.
+                                        properties:
+                                            account: { type: string }
+                                            variable_symbol: { type: string }
+                                    paid_by:
+                                        type: object
+                                        nullable: true
+                                        properties:
+                                            bank_movement_id: { type: string }
+                                            booked_on: { type: string, format: date }
+                        possible_duplicates:
+                            type: array
+                            description: 'Active planned items of Cash flow in the categories taxes and insurance, which the estimate flows may count twice. The estimate never ends them; the owner does.'
+                            items:
+                                type: object
+                                properties:
+                                    planned_item_id: { type: string, format: uuid }
+                                    name: { type: string }
+                                    category: { type: string, enum: [taxes, insurance] }
+                        warnings: { type: array, items: { type: string, example: sources_unavailable } }
+                        unverified: { type: array, items: { type: string, example: vat_cash_basis }, description: Rules an accountant should confirm. }
+                        known_gaps: { type: array, items: { type: string } }
+                TaxForecastPart:
+                    type: object
+                    properties:
+                        income: { $ref: '#/components/schemas/TaxAmountFigures' }
+                        cost: { $ref: '#/components/schemas/TaxAmountFigures' }
+                TaxAmounts:
+                    type: object
+                    description: 'The actual income and costs on a cash basis: each payment on its own day, split into net and VAT in the ratio of its document, at the ČNB rate of its day. Refunds and credit notes are negative. Only the owner reads them.'
+                    properties:
+                        from: { type: string, format: date }
+                        to: { type: string, format: date }
+                        totals:
+                            type: object
+                            properties:
+                                income: { $ref: '#/components/schemas/TaxAmountFigures' }
+                                cost: { $ref: '#/components/schemas/TaxAmountFigures' }
+                        months:
+                            type: array
+                            items:
+                                allOf:
+                                    - $ref: '#/components/schemas/TaxAmountFigures'
+                                    - type: object
+                                      properties:
+                                          month: { type: string, example: '2026-11' }
+                                          kind: { type: string, enum: [income, cost] }
+                                          source: { type: string, example: invoicing.payments }
+                        amounts:
+                            type: array
+                            description: The payments of the documents the caller may read.
+                            items:
+                                type: object
+                                properties:
+                                    source: { type: string, example: invoicing.payments }
+                                    subject:
+                                        type: object
+                                        properties:
+                                            type: { type: string, example: invoice }
+                                            id: { type: string, format: uuid }
+                                            url: { type: string, nullable: true }
+                                    kind: { type: string, enum: [income, cost] }
+                                    paid_on: { type: string, format: date }
+                                    tax_point_on: { type: string, format: date, nullable: true }
+                                    advance: { type: boolean }
+                                    gross: { $ref: '#/components/schemas/Money' }
+                                    net: { $ref: '#/components/schemas/Money' }
+                                    vat: { $ref: '#/components/schemas/Money' }
+                                    gross_czk: { $ref: '#/components/schemas/Money' }
+                                    net_czk: { $ref: '#/components/schemas/Money' }
+                                    vat_czk: { $ref: '#/components/schemas/Money' }
+                                    counted_czk: { $ref: '#/components/schemas/Money' }
+                        unavailable_sources: { type: array, items: { type: string }, description: The sources not installed or that failed; their amounts are missing. }
+                        restricted_sources: { type: array, items: { type: string }, description: The sources whose documents the caller may not read; they count in the sums only. }
+                        missing_rates: { type: array, items: { type: string }, description: The currencies without a rate on a payment day; those payments are left out. }
+                        unverified: { type: array, items: { type: string, enum: [fx_payment_day, vat_cash_basis] }, description: Rules an accountant should confirm. }
+                        known_gaps: { type: array, items: { type: string, enum: [non_deductible_costs, assets] }, description: What the received documents cannot say yet. }
+                ReceivedDocument:
+                    type: object
+                    description: 'A document a firm received from a supplier. Paid and remaining are positive, also for a credit note, whose total is negative.'
+                    properties:
+                        id: { type: string, format: uuid }
+                        firm: { $ref: '#/components/schemas/Reference' }
+                        state: { type: string, enum: [draft, recorded] }
+                        kind: { type: string, enum: [tax_invoice, simplified_receipt, foreign_invoice, credit_note, advance_request, other] }
+                        treatment: { type: string, enum: [domestic, domestic_reverse_charge, eu_service, non_eu_service, not_vat_document, non_deductible] }
+                        evidence_number: { type: string, nullable: true }
+                        supplier: { allOf: [{ $ref: '#/components/schemas/Reference' }], nullable: true }
+                        supplier_number: { type: string }
+                        variable_symbol: { type: string }
+                        issue_date: { type: string, format: date, nullable: true }
+                        tax_point_date: { type: string, format: date, nullable: true }
+                        due_date: { type: string, format: date, nullable: true }
+                        received_date: { type: string, format: date, nullable: true }
+                        total: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                        base: { $ref: '#/components/schemas/Money' }
+                        vat: { $ref: '#/components/schemas/Money' }
+                        vat_czk: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                        paid: { $ref: '#/components/schemas/Money' }
+                        remaining: { $ref: '#/components/schemas/Money' }
+                        is_paid: { type: boolean }
+                        last_paid_on: { type: string, format: date, nullable: true }
+                        has_original_file: { type: boolean }
+                        recorded_at: { type: string, format: date-time, nullable: true }
+                        trashed_at: { type: string, format: date-time, nullable: true }
+                        created_at: { type: string, format: date-time }
+                ReceivedDocumentPayment:
+                    type: object
+                    properties:
+                        id: { type: string, format: uuid }
+                        paid_on: { type: string, format: date }
+                        amount: { $ref: '#/components/schemas/Money' }
+                        method: { type: string, enum: [bank_transfer, card, cash, other] }
+                        bank_movement_id: { type: string, format: uuid, nullable: true }
+                        created_at: { type: string, format: date-time }
+                ReceivedDocumentDetail:
+                    allOf:
+                        - $ref: '#/components/schemas/ReceivedDocument'
+                        - type: object
+                          properties:
+                              supplier_snapshot:
+                                  type: object
+                                  properties:
+                                      name: { type: string }
+                                      registration_number: { type: string, nullable: true }
+                                      vat_id: { type: string, nullable: true }
+                              vat_recap:
+                                  type: array
+                                  items:
+                                      type: object
+                                      properties:
+                                          rate: { type: string, example: '21' }
+                                          base: { $ref: '#/components/schemas/Money' }
+                                          vat: { $ref: '#/components/schemas/Money' }
+                                          base_czk: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                                          vat_czk: { allOf: [{ $ref: '#/components/schemas/Money' }], nullable: true }
+                              exchange_rate: { type: string, nullable: true }
+                              exchange_rate_date: { type: string, format: date, nullable: true }
+                              deduction_period: { type: string, nullable: true, example: '2026-12' }
+                              latest_deduction_date: { type: string, format: date, nullable: true }
+                              supply_code: { type: string, nullable: true }
+                              original_document_id: { type: string, format: uuid, nullable: true }
+                              trashed_reason: { type: string, nullable: true }
+                              payments: { type: array, items: { $ref: '#/components/schemas/ReceivedDocumentPayment' } }
+                ReceivedDocumentPage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/ReceivedDocument' } }
+                        next_cursor: { type: string, nullable: true }
+                        applied_view: { allOf: [{ $ref: '#/components/schemas/SavedView' }], nullable: true, description: 'The saved view the view parameter named; null without one.' }
+                WebhookEndpoint:
+                    type: object
+                    description: An HTTPS address that receives the events it subscribes to as signed Standard Webhooks requests. It never holds the secret.
+                    required: [id, url, description, event_types, version, active, disabled_reason, owner_id, previous_secret_expires_at, created_at, updated_at]
+                    properties:
+                        id: { type: string, format: uuid }
+                        url: { type: string, example: 'https://hooks.example.com/foresi' }
+                        description: { type: string, nullable: true }
+                        event_types: { type: array, items: { type: string }, example: ['invoicing.invoice.paid', 'invoicing.payment.*'] }
+                        version: { type: integer, description: 'The event version the endpoint receives; an event of another version is not sent to it.' }
+                        active: { type: boolean }
+                        disabled_reason: { type: string, nullable: true, enum: [gone, failing, owner_lost_access, manual, null] }
+                        owner_id: { type: string, format: uuid, description: 'The person who registered the endpoint.' }
+                        previous_secret_expires_at: { type: string, format: date-time, nullable: true, description: 'Until when the secret before the last rotation still signs.' }
+                        created_at: { type: string, format: date-time }
+                        updated_at: { type: string, format: date-time }
+                WebhookEndpointWithSecret:
+                    allOf:
+                        - $ref: '#/components/schemas/WebhookEndpoint'
+                        - type: object
+                          required: [secret]
+                          properties:
+                              secret: { type: string, example: 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw', description: 'The signing secret. Store it now.' }
+                WebhookEndpointPage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/WebhookEndpoint' } }
+                        next_cursor: { type: string, nullable: true }
+                WebhookEndpointCreate:
+                    type: object
+                    required: [url, event_types]
+                    properties:
+                        url: { type: string, description: 'https, with a host that resolves outside private networks, at most 2048 characters.' }
+                        event_types: { type: array, items: { type: string }, description: 'Event names or "module.*"; "*" is refused.' }
+                        description: { type: string, nullable: true, maxLength: 255 }
+                        version: { type: integer, default: 1 }
+                WebhookEndpointUpdate:
+                    type: object
+                    description: Only the fields sent change. A description of null clears it.
+                    properties:
+                        url: { type: string }
+                        event_types: { type: array, items: { type: string } }
+                        description: { type: string, nullable: true, maxLength: 255 }
+                        version: { type: integer }
+                        active: { type: boolean, description: 'false disables the endpoint (reason manual), true enables it.' }
+                WebhookSecret:
+                    type: object
+                    required: [secret, previous_secret_expires_at]
+                    properties:
+                        secret: { type: string, example: 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw' }
+                        previous_secret_expires_at: { type: string, format: date-time, nullable: true }
+                WebhookQueuedAttempt:
+                    type: object
+                    required: [delivery_id, attempt_id]
+                    properties:
+                        delivery_id: { type: string, format: uuid }
+                        attempt_id: { type: string, format: uuid, description: 'The attempt as it will show in the delivery once it is made.' }
+                WebhookDelivery:
+                    type: object
+                    description: One event, or one ping, for one endpoint. The body is not part of it.
+                    required: [id, endpoint_id, event_id, event_type, kind, status, attempt_count, last_status_code, next_attempt_at, created_at, finished_at]
+                    properties:
+                        id: { type: string, format: uuid }
+                        endpoint_id: { type: string, format: uuid }
+                        event_id: { type: string, format: uuid, description: 'The webhook-id header of every attempt.' }
+                        event_type: { type: string, example: invoicing.invoice.paid }
+                        kind: { type: string, enum: [event, ping] }
+                        status: { type: string, enum: [pending, succeeded, failed] }
+                        attempt_count: { type: integer }
+                        last_status_code: { type: integer, nullable: true }
+                        next_attempt_at: { type: string, format: date-time, nullable: true }
+                        created_at: { type: string, format: date-time }
+                        finished_at: { type: string, format: date-time, nullable: true }
+                WebhookAttempt:
+                    type: object
+                    required: [id, attempted_at, duration_ms, status_code, error, trigger]
+                    properties:
+                        id: { type: string, format: uuid }
+                        attempted_at: { type: string, format: date-time }
+                        duration_ms: { type: integer }
+                        status_code: { type: integer, nullable: true }
+                        error: { type: string, nullable: true, enum: [timeout, tls, blocked_address, connection, redirect, endpoint_disabled, null] }
+                        trigger: { type: string, enum: [schedule, manual, ping] }
+                WebhookDeliveryDetail:
+                    allOf:
+                        - $ref: '#/components/schemas/WebhookDelivery'
+                        - type: object
+                          required: [attempts]
+                          properties:
+                              attempts: { type: array, items: { $ref: '#/components/schemas/WebhookAttempt' } }
+                WebhookDeliveryPage:
+                    type: object
+                    required: [data, next_cursor]
+                    properties:
+                        data: { type: array, items: { $ref: '#/components/schemas/WebhookDelivery' } }
+                        next_cursor: { type: string, nullable: true }
+    areas:
+        default:
+            # The API itself; the document is not one of its operations.
+            path_patterns: ['^/api/v1/(?!openapi\.json$)']

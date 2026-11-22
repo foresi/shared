@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=../../../../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+
+# The parameters of the installation itself. Every module loads its own services,
+# parameters and test wiring from src/<Module>/config/services.php, through its
+# bundle (Foresi\Shared\Infrastructure\Module\ModuleBundle); a definition here
+# would override the module's.
+parameters:
+    # The product name shown on every page; the only place it is defined.
+    app.product_name: Foresi
+    # The released version, named as the issuing system in electronic documents. A release sets it.
+    app.version: 0.4.0
+    # The zone of the instance's days, a canonical tz name such as Europe/Prague;
+    # empty follows the country of the firm, else UTC. Checked at boot.
+    env(APP_TIMEZONE): ''
+    app.timezone: '%env(timezone:APP_TIMEZONE)%'
